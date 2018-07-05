@@ -119,7 +119,6 @@ class DNSMessage:
         return message
     
     def __repr__(self):
-        print(type(self.qr), type(self.opcode))
         ops = [self.qr.name, self.opcode.name]
         if self.aa: ops.append("aa")
         if self.tc: ops.append("tc")
