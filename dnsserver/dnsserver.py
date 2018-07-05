@@ -126,7 +126,7 @@ class DNSMessage:
         if self.ra: ops.append("ra")
         ops.append(self.rcode.name)
 
-        return f"DNSMessage(id:{self.id_}, ops=[{', '.join(ops)}]," \
+        return f"DNSMessage(id:{self.id_} ops:[{', '.join(ops)}]" \
             f" qry:{len(self.queries)}" \
             f" ans:{len(self.answers)}" \
             f" aut:{len(self.authorities)}" \
