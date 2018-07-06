@@ -69,54 +69,72 @@ class DNSMessageException(Exception):
 
 class DNSMessageCompression:
     @classmethod
-    def decode_name(cls, bytes_):
-        name = []
-        i = 0
+    def decode_names(cls, bytes_, offset):
+        names = []
+        total_bytes_read = 0
+        byte_count = len(bytes_)
+        while offset < byte_count:
+            name, bytes_read = cls._decode_name(bytes_, total_bytes_read + offset)
+            total_bytes_read += bytes_read
+            if name == '.':
+                if len(names) == 0:
+                    names.append(name)
+                break
+            names.append(name)
+        return names, total_bytes_read
 
-        while i < len(bytes_):
-            n = bytes_[i]
+    @classmethod
+    def _decode_name(cls, bytes_, offset):
+        name = []
+        bytes_read = 0
+
+        while bytes_read < len(bytes_):
+            j = bytes_read + offset
+            n = bytes_[j]
 
             if n == 0:
-                i += 1
+                bytes_read += 1
                 break
             
-            if n & 0xC0 == 0xC0:
-                name.append(cls._decode_label(bytes_, i))
-                i += 2
+            if n & 0xc0 == 0xc0:
+                name.append(cls._decode_label(bytes_, j))
+                bytes_read += 2
                 break
 
-            name.append(''.join([chr(byte) for byte in bytes_[i+1:i+1+n]]))
-            i += 1 + n
+            name.append(''.join([chr(byte) for byte in bytes_[j+1:j+1+n]]))
+            bytes_read += 1 + n
 
-        return ''.join(('.'.join(name), '.')), i
+        return ''.join(('.'.join(name), '.')), bytes_read
     
     @classmethod
     def _decode_label(cls, bytes_, i):
-        name, _ = cls.decode_name(bytes_[i:])
-        return name
+        offset = (bytes_[i] & 0x3f) << 8
+        offset += bytes_[i + 1]
+        name, _ = cls._decode_name(bytes_, offset)
+        return name[:-1]
 
 
 class DNSQuestionSection:
     def __init__(self):
         self.names = []
+        self.qtype = None
+        self.qclass = None
     
     def to_bytes(self):
         return b''
 
     @staticmethod
-    def from_bytes(bytes_):
+    def from_bytes(bytes_, offset=12):
         qs = DNSQuestionSection()
-        i = 0
-        byte_count = len(bytes_)
-        while i < byte_count:
-            name, bytes_read = DNSMessageCompression.decode_name(bytes_[i:])
-            i += bytes_read
-            if name == '.':
-                if len(qs.names) == 0:
-                    qs.names.append(name)
-                break
-            qs.names.append(name)
-        return qs, i
+        
+        names, bytes_read = DNSMessageCompression.decode_names(bytes_, offset)
+        qs.names = names
+
+        i = offset + bytes_read
+        qs.qtype = bytes_to_int(bytes_[i:i+2])
+        qs.qclass = bytes_to_int(bytes_[i+2:i+4])
+
+        return qs, bytes_read + 4
     
     def __len__(self):
         return len(self.to_bytes())
@@ -228,7 +246,7 @@ class DNSMessage:
 
         offset = 12
         for _ in range(qdcount):
-            qs, bytes_read = DNSQuestionSection.from_bytes(bytes_[offset:])
+            qs, bytes_read = DNSQuestionSection.from_bytes(bytes_, offset)
             message.add_question_section(qs)
             offset += bytes_read
         
