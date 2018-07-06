@@ -16,6 +16,8 @@ def bytes_to_int(bytes_):
 
 def display_message_bits(data):
     bits = [bin(data[n])[2:].zfill(8) for n in range(len(data))]
+    if len(bits) % 2 != 0:
+        bits.append('--------')
     print('---BEGIN_MESSAGE---')
-    print('\n'.join([f'{bits[n]} {bits[n+1]}' for n in range(0, len(bits), 2)]))
+    print('\n'.join([f'{bits[n]} {bits[n+1]}' for n in range(0, len(bits)-1, 2)]))
     print('---END_MESSAGE--')
