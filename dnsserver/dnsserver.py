@@ -157,9 +157,10 @@ class DNSAdditionalSection:
 
 class DNSMessage:
     # See - https://www.ietf.org/rfc/rfc1035.txt
+    # See - https://www.ietf.org/rfc/rfc2065.txt (ad / cd)
     __slots__ = [
         'id_',
-        'qr', 'opcode', 'aa', 'tc', 'rd', 'ra', 'z', 'rcode',
+        'qr', 'opcode', 'aa', 'tc', 'rd', 'ra', 'z', 'ad', 'cd', 'rcode',
         'queries',
         'answers',
         'authorities',
@@ -174,6 +175,8 @@ class DNSMessage:
         self.rd = False
         self.ra = False
         self.z = 0
+        self.ad = False
+        self.cd = False
         self.rcode = DNSRCode.NXDOMAIN
         self.queries = []
         self.answers = []
@@ -214,6 +217,8 @@ class DNSMessage:
         if self.rd: high_byte |= 0x01
 
         if self.ra: low_byte |= 0x80
+        if self.ad: low_byte |= 0x20
+        if self.cd: low_byte |= 0x10
         low_byte |= (self.rcode.value & 0x0F)
         
         return bytes([high_byte, low_byte])
@@ -222,8 +227,8 @@ class DNSMessage:
         high_byte = options[0]
         low_byte = options[1]
         
-        if low_byte & 0x70 != 0:
-            raise DNSMessageException("Z field should be 0 (zero)")
+        if low_byte & 0x40 != 0:
+           raise DNSMessageException("Z field should be 0 (zero)")
 
         self.qr = DNSqr((high_byte & 0x80) >> 7)
         self.opcode = DNSOpCode((high_byte & 0x78) >> 3)
@@ -231,6 +236,9 @@ class DNSMessage:
         self.tc = (high_byte & 0x02) != 0
         self.rd = (high_byte & 0x01) != 0
         self.ra = (low_byte & 0x80) != 0
+        self.z  = (low_byte & 0x40) != 0
+        self.ad = (low_byte & 0x20) != 0
+        self.cd = (low_byte & 0x10) != 0
         self.rcode = DNSRCode(low_byte & 0x0F)
 
     @staticmethod
@@ -261,6 +269,8 @@ class DNSMessage:
         if self.tc: ops.append("tc")
         if self.rd: ops.append("rd")
         if self.ra: ops.append("ra")
+        if self.ad: ops.append("ad")
+        if self.cd: ops.append("cd")
         ops.append(self.rcode.name)
 
         return f"DNSMessage(id:{self.id_} ops:[{', '.join(ops)}]" \
